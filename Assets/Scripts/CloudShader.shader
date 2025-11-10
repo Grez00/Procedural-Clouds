@@ -187,7 +187,7 @@ Shader "Custom/CloudShader"
             fixed4 frag (v2f i) : SV_Target
             {
                 // Create uv for camera ray
-                float2 cam_uv = float2(i.uv.x, 1.0 - i.uv.y);
+                float2 cam_uv = float2(1.0 - i.uv.x, 1.0 - i.uv.y);
                 cam_uv = (cam_uv * 2.0) - 1.0;
 
                 // Create origin and direction of camera ray
