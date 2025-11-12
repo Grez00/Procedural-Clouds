@@ -1,0 +1,75 @@
+#pragma kernel CSMain
+
+float2 _Resolution;
+RWTexture2D<float4> _Result;
+
+int _NumPoints;
+StructuredBuffer<float2> _Points;
+
+float2 _ChunkSize;
+
+float _PointRadius;
+float _LineRadius;
+float _DensityFactor;
+
+float RandomRange(float2 seed, float min, float max)
+{
+	float randnum = frac(sin(dot(seed, float2(12.9898, 78.233)))*43758.5453);
+	return lerp(min, max, randnum);
+}
+
+float2 ImageToChunk(float2 imgPos){
+    return float2((int)(imgPos.x/_ChunkSize.x), (int)(imgPos.y/_ChunkSize.y));
+}
+
+void DrawChunks(inout float4 col, float2 pos){
+    float2 chunkPos = ImageToChunk(pos);
+    float2 min = float2(chunkPos.x * _ChunkSize.x, chunkPos.y * _ChunkSize.y);
+    float2 max = min + float2(_ChunkSize.x, _ChunkSize.y);
+    if ((pos.x - min.x) <= _LineRadius || (max.x - pos.x) <= _LineRadius || (pos.y - min.y) <= _LineRadius || (max.y - pos.y) <= _LineRadius){
+        col = float4(0.5, 0.5, 0.5, 0.0);
+    }
+}
+
+void DrawPoints(inout float4 col, float2 pos){
+    for (int i = 0; i < _NumPoints; i++){
+        float dist = length(_Points[i] - pos);
+        if (dist <= _PointRadius){
+            col.r = 1.0;
+            break;
+        }
+    }
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float4 col = float4(0.0, 0.0, 0.0, 0.0);
+    float2 chunkPos = ImageToChunk(id.xy);
+
+    // Debug, Draw Chunks
+    //DrawChunks(col, id.xy);
+
+    // Debug, Draw Points
+    //DrawPoints(col, id.xy);
+
+    int numChunks = sqrt(_NumPoints);
+    float mindist = 1.#INF;
+    int maxIterations = 999999;
+    int iterations = 0;
+    for (int x = chunkPos.x-1; x < chunkPos.x+2; x++){
+        if (x < 0) continue;
+        for (int y = chunkPos.y-1; y < chunkPos.y+2; y++){
+            if (y < 0) continue;
+            mindist = min(mindist, length(id.xy - _Points[x + (y * numChunks)]));
+
+            iterations++;
+            if (iterations > maxIterations) break;
+        }
+        iterations++;
+        if (iterations > maxIterations) break;
+    }
+    col += _DensityFactor * mindist / max(_Resolution.x, _Resolution.y);
+
+    _Result[id.xy] = 1.0 - col;
+}

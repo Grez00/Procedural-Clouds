@@ -21,6 +21,8 @@ Shader "Custom/CloudShader"
             // make fog work
             #pragma multi_compile_fog
 
+            #pragma target 3.0
+
             #include "UnityCG.cginc"
 
             struct appdata
@@ -47,6 +49,9 @@ Shader "Custom/CloudShader"
             float3 _BoxX;
             float3 _BoxY;
             float3 _BoxZ;
+
+            float _PlaneHeight;
+            float _Absorption;
 
             struct Ray{
                 float3 origin;
@@ -198,7 +203,7 @@ Shader "Custom/CloudShader"
 
                 // Create camera ray, ground plane, and obb
                 Ray ray = CreateRay(origin, direction);
-                Plane ground_plane = CreatePlane(float3(0.0, 1.0, 0.0), float3(0.0, 0.0, 0.0));
+                Plane ground_plane = CreatePlane(float3(0.0, 1.0, 0.0), float3(0.0, _PlaneHeight, 0.0));
                 Axes axes = CreateAxes(_BoxX, _BoxY, _BoxZ);
                 OBB obb = CreateOBB(_BoxCenter, _BoxExtents, axes);
 
@@ -213,12 +218,14 @@ Shader "Custom/CloudShader"
                 // test collisions
                 float3 hitpoint = float3(99999, 99999, 99999);
                 if (IntersectPlane(ray, ground_plane, hitpoint) && depth > length(hitpoint - origin)){
-                    col.rgb = ray.direction;
+                    col.rgb = float3(1, 1, 1);
                 }
                 float3 entrypoint = float3(99999, 99999, 99999);
                 float3 exitpoint = float3(99999, 99999, 99999);
                 if (IntersectOBB(ray, obb, entrypoint, exitpoint) && depth > length(entrypoint - origin) && length(hitpoint - origin) > length(entrypoint - origin)){
-                    col.rgb = float3(i.uv, 0.5);
+                    float penDepth = length(exitpoint - entrypoint);
+                    float absorption = exp2(-penDepth * _Absorption);
+                    col.rgb = lerp(direction, col.rgb, absorption);
                 }
 
                 // apply fog
